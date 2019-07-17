@@ -448,7 +448,7 @@ using System.Text;
                 var requiresFullBody = GraphQlGeneratorConfiguration.CSharpVersion == CSharpVersion.Compatible || args.Any();
                 var returnPrefix = requiresFullBody ? "        return " : String.Empty;
 
-                if (fieldType.Kind == GraphQlTypeKindScalar || fieldType.Kind == GraphQlTypeKindEnum || fieldType.Kind == GraphQlTypeKindScalar)
+                if (fieldType.Kind == GraphQlTypeKindScalar || fieldType.Kind == GraphQlTypeKindEnum)
                 {
                     builder.Append($"    public {className} With{NamingHelper.ToPascalCase(field.Name)}({methodParameters})");
 
@@ -475,44 +475,70 @@ using System.Text;
                 {
                     if (String.IsNullOrEmpty(fieldType.Name))
                         throw new InvalidOperationException($"Field '{field.Name}' type name not resolved. ");
-
-                    var builderParameterName = NamingHelper.LowerFirst(fieldType.Name);
-                    builder.Append($"    public {className} With{NamingHelper.ToPascalCase(field.Name)}({fieldType.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix} {builderParameterName}QueryBuilder");
-
-                    if (args.Length > 0)
-                    {
-                        builder.Append(", ");
-                        builder.Append(methodParameters);
-                    }
-
-                    builder.Append(")");
-
-                    if (requiresFullBody)
-                    {
-                        builder.AppendLine();
-                        builder.AppendLine("    {");
-                    }
-                    else
-                        builder.Append(" => ");
-
-                    AppendArgumentDictionary(builder, args);
-
-                    builder.Append($"{returnPrefix}WithObjectField(\"{field.Name}\", {builderParameterName}QueryBuilder");
-
-                    if (args.Length > 0)
-                        builder.Append(", args");
-
-                    builder.AppendLine(");");
-
-                    if (requiresFullBody)
-                        builder.AppendLine("    }");
+                    
+                    GenerateWithObjectFieldMethod(builder, className, "With", fieldType, args, methodParameters, requiresFullBody, returnPrefix, null, field);
                 }
-
+                
                 if (i < fields.Length - 1)
                     builder.AppendLine();
             }
 
+            if (type.PossibleTypes != null)
+            {
+                foreach (var possibleType in type.PossibleTypes)
+                {
+                    GenerateWithObjectFieldMethod(builder, className, "On", possibleType, null, null, true, "        return ", "...on ");
+                    builder.AppendLine();
+                }
+            }
+
             builder.AppendLine("}");
+        }
+
+        private static void GenerateWithObjectFieldMethod(
+            StringBuilder builder,
+            string className,
+            string methodNamePrefix,
+            GraphQlFieldType fieldType,
+            GraphQlArgument[] args,
+            string methodParameters,
+            bool requiresFullBody,
+            string returnPrefix,
+            string fieldNamePrefix = null,
+            GraphQlField field = null)
+        {
+            var builderParameterName = NamingHelper.LowerFirst(fieldType.Name);
+            var fieldName = field == null ? fieldType.Name : field.Name;
+            builder.Append(
+                $"    public {className} {methodNamePrefix}{NamingHelper.ToPascalCase(fieldName)}({fieldType.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix} {builderParameterName}QueryBuilder");
+
+            if (args != null && args.Length > 0)
+            {
+                builder.Append(", ");
+                builder.Append(methodParameters);
+            }
+
+            builder.Append(")");
+
+            if (requiresFullBody)
+            {
+                builder.AppendLine();
+                builder.AppendLine("    {");
+            }
+            else
+                builder.Append(" => ");
+
+            AppendArgumentDictionary(builder, args);
+
+            builder.Append($"{returnPrefix}WithObjectField(\"{fieldNamePrefix}{fieldName}\", {builderParameterName}QueryBuilder");
+
+            if (args != null && args.Length > 0)
+                builder.Append(", args");
+
+            builder.AppendLine(");");
+
+            if (requiresFullBody)
+                builder.AppendLine("    }");
         }
 
         private static void WriteOverrideProperty(string propertyType, string propertyName, string propertyValue, StringBuilder builder)
@@ -576,7 +602,7 @@ using System.Text;
 
         private static void AppendArgumentDictionary(StringBuilder builder, ICollection<GraphQlArgument> args)
         {
-            if (args.Count == 0)
+            if (args == null || args.Count == 0)
                 return;
 
             builder.AppendLine("        var args = new Dictionary<string, object>();");
