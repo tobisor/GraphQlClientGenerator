@@ -275,7 +275,6 @@ using System.Text;
             switch (fieldType.Kind)
             {
                 case GraphQlTypeKindObject:
-                case GraphQlTypeKindInterface:
                 case GraphQlTypeKindUnion:
                 case GraphQlTypeKindInputObject:
                     propertyType = $"{fieldType.Name}{GraphQlGeneratorConfiguration.ClassPostfix}";
@@ -283,8 +282,11 @@ using System.Text;
                 case GraphQlTypeKindEnum:
                     propertyType = $"{fieldType.Name}?";
                     break;
+                case GraphQlTypeKindInterface:
+                    propertyType = GetItemType(baseType, member, fieldType);
+                    break;
                 case GraphQlTypeKindList:
-                    var itemType = IsUnknownObjectScalar(baseType, member.Name, fieldType.OfType) ? "object" : $"{fieldType.OfType.UnwrapIfNonNull().Name}{GraphQlGeneratorConfiguration.ClassPostfix}";
+                    var itemType = GetItemType(baseType, member, fieldType);
                     var suggestedNetType = ScalarToNetType(baseType, member.Name, fieldType.OfType.UnwrapIfNonNull()).TrimEnd('?');
                     if (!String.Equals(suggestedNetType, "object") && !suggestedNetType.TrimEnd().EndsWith("System.Object"))
                         itemType = suggestedNetType;
@@ -329,6 +331,29 @@ using System.Text;
             }
 
             builder.AppendLine($"    {(isInterfaceMember ? null : "public ")}{propertyType} {propertyName} {{ get; set; }}");
+        }
+
+        private static string GetItemType(GraphQlType baseType, IGraphQlMember member, GraphQlFieldType fieldType)
+        {
+            const string ObjectString = "object";
+
+            if (fieldType.OfType == null)
+            {
+                return $"{fieldType.Name}{GraphQlGeneratorConfiguration.ClassPostfix}";
+            }
+
+            if (IsUnknownObjectScalar(baseType, member.Name, fieldType.OfType))
+            {
+                return ObjectString;
+            }
+            
+            var typeName = $"{fieldType.OfType.UnwrapIfNonNull().Name}{GraphQlGeneratorConfiguration.ClassPostfix}";
+            if (fieldType.OfType.Kind == GraphQlTypeKindInterface)
+            {
+                typeName = $"I{typeName}";
+            }
+
+            return typeName;
         }
 
         private static string GetFloatNetType()
@@ -620,7 +645,7 @@ using System.Text;
         {
             fieldType = fieldType.UnwrapIfNonNull();
 
-            if (fieldType.Kind != GraphQlTypeKindScalar)
+            if (fieldType?.Kind != GraphQlTypeKindScalar)
                 return false;
 
             var netType = ScalarToNetType(baseType, valueName, fieldType);
