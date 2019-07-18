@@ -24,6 +24,8 @@ namespace GraphQlClientGenerator
         internal const string GraphQlTypeKindInterface = "INTERFACE";
         private const string IntrospectionOperation = "IntrospectionQuery";
 
+        private static readonly IDictionary<string, GraphQlType> _typesDictionary = new Dictionary<string, GraphQlType>();
+
         public const string RequiredNamespaces =
             @"using Newtonsoft.Json.Linq;
 using System;
@@ -63,8 +65,15 @@ using System.Text;
                     if (!response.IsSuccessStatusCode)
                         throw new InvalidOperationException($"Status code: {(int)response.StatusCode} ({response.StatusCode}); content: {content}");
                 }
+                
+                var schema = JsonConvert.DeserializeObject<GraphQlResult>(content, SerializerSettings).Data.Schema;
 
-                return JsonConvert.DeserializeObject<GraphQlResult>(content, SerializerSettings).Data.Schema;
+                foreach (var schemaType in schema.Types)
+                {
+                    _typesDictionary.Add(schemaType.Name, schemaType);
+                }
+
+                return schema;
             }
         }
 
@@ -367,9 +376,12 @@ using System.Text;
             }
         }
 
-        private static void GenerateTypeQueryBuilder(GraphQlType type, string queryPrefix, StringBuilder builder)
+        private static void GenerateTypeQueryBuilder(GraphQlType type, string queryPrefix, StringBuilder builder, List<GraphQlType> parentTypes = null)
         {
-            var className = $"{type.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix}";
+            var isDescendant = parentTypes != null && parentTypes.Any();
+            var typeNamePrefix = isDescendant ? NamingHelper.ToPascalCase(string.Concat(parentTypes.Select(parentType => parentType.Name))) : string.Empty;
+
+            var className = $"{typeNamePrefix}{type.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix}";
             ValidateClassName(className);
 
             builder.AppendLine($"public class {className} : GraphQlQueryBuilder<{className}>");
@@ -380,7 +392,7 @@ using System.Text;
             builder.AppendLine("        {");
 
             var fields = type.Fields?.ToArray();
-            for (var i = 0; i < fields?.Length; i++)
+            for (var i = 0; fields != null && i < fields.Length; i++)
             {
                 var comma = i == fields.Length - 1 ? null : ",";
                 var field = fields[i];
@@ -485,14 +497,29 @@ using System.Text;
 
             if (type.PossibleTypes != null)
             {
-                foreach (var possibleType in type.PossibleTypes)
+                foreach (var possibleFieldType in type.PossibleTypes)
                 {
-                    GenerateWithObjectFieldMethod(builder, className, "On", possibleType, null, null, true, "        return ", "...on ");
+                    GenerateWithObjectFieldMethod(builder, className, "On", possibleFieldType, null, null, true, "        return ", "...on ");
                     builder.AppendLine();
                 }
             }
 
             builder.AppendLine("}");
+
+            if (type.PossibleTypes != null)
+            {
+                foreach (var possibleFieldType in type.PossibleTypes)
+                {
+                    builder.AppendLine();
+                    var possibleType = _typesDictionary[possibleFieldType.Name];
+                    GenerateTypeQueryBuilder(
+                        possibleType,
+                        queryPrefix,
+                        builder,
+                        isDescendant ? parentTypes.Union(new List<GraphQlType> { type }).ToList() : new List<GraphQlType> { type });
+                    builder.AppendLine();
+                }
+            }
         }
 
         private static void GenerateWithObjectFieldMethod(

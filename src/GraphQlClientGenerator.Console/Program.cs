@@ -7,7 +7,7 @@ namespace GraphQlClientGenerator.Console
     {
         public static async Task Main(string[] args)
         {
-            if (args.Length < 3)
+            if (args == null || args.Length < 3)
             {
                 PrintHelp();
                 return;
