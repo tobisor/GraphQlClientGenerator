@@ -264,7 +264,7 @@ using System.Text;
                 builder.Append(" : ");
                 builder.Append(baseTypeName);
             }
-
+            
             builder.AppendLine();
             builder.AppendLine("{");
 
@@ -421,6 +421,8 @@ using System.Text;
                 WriteOverrideProperty("string", "Prefix", $"\"{queryPrefix}\"", builder);
 
             WriteOverrideProperty("IList<FieldMetadata>", "AllFields", "AllFieldMetadata", builder);
+            
+            builder.AppendLine();
 
             for (var i = 0; i < fields?.Length; i++)
             {
@@ -485,7 +487,7 @@ using System.Text;
                     if (String.IsNullOrEmpty(fieldType.Name))
                         throw new InvalidOperationException($"Field '{field.Name}' type name not resolved. ");
                     
-                    GenerateWithObjectFieldMethod(builder, className, "With", fieldType, args, methodParameters, requiresFullBody, returnPrefix, null, field);
+                    GenerateObjectFieldMethod(builder, className, "With", fieldType, args, methodParameters, requiresFullBody, returnPrefix, null, field);
                 }
                 
                 if (i < fields.Length - 1)
@@ -496,7 +498,7 @@ using System.Text;
             {
                 foreach (var possibleFieldType in type.PossibleTypes)
                 {
-                    GenerateWithObjectFieldMethod(builder, className, "On", possibleFieldType, null, null, true, "        return ", "... on ");
+                    GenerateObjectFieldMethod(builder, className, "On", possibleFieldType, null, null, true, "        return ", "... on ");
                     builder.AppendLine();
                 }
             }
@@ -504,7 +506,7 @@ using System.Text;
             builder.AppendLine("}");
         }
 
-        private static void GenerateWithObjectFieldMethod(
+        private static void GenerateObjectFieldMethod(
             StringBuilder builder,
             string className,
             string methodNamePrefix,
