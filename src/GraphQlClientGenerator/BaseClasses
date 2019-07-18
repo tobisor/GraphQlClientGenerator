@@ -210,6 +210,7 @@ public abstract class GraphQlQueryBuilder
             {
                 builder.Append(separator);
                 builder.Append(fieldCriteria);
+				builder.Append(", typename: __typename");
             }
 
             separator = ",";

@@ -7,7 +7,7 @@ namespace GraphQlClientGenerator.Console
     {
         public static async Task Main(string[] args)
         {
-            if (args.Length < 3)
+            if (args == null || args.Length < 3)
             {
                 PrintHelp();
                 return;
@@ -24,7 +24,8 @@ namespace GraphQlClientGenerator.Console
             }
             catch (Exception exception)
             {
-                System.Console.WriteLine($"An error occured: {exception.Message}");
+                System.Console.WriteLine($@"An error occured: {exception.Message}, 
+StackTrace: {exception.StackTrace}");
             }
         }
 
