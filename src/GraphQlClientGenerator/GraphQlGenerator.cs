@@ -376,12 +376,9 @@ using System.Text;
             }
         }
 
-        private static void GenerateTypeQueryBuilder(GraphQlType type, string queryPrefix, StringBuilder builder, List<GraphQlType> parentTypes = null)
+        private static void GenerateTypeQueryBuilder(GraphQlType type, string queryPrefix, StringBuilder builder)
         {
-            var isDescendant = parentTypes != null && parentTypes.Any();
-            var typeNamePrefix = isDescendant ? NamingHelper.ToPascalCase(string.Concat(parentTypes.Select(parentType => parentType.Name))) : string.Empty;
-
-            var className = $"{typeNamePrefix}{type.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix}";
+            var className = $"{type.Name}QueryBuilder{GraphQlGeneratorConfiguration.ClassPostfix}";
             ValidateClassName(className);
 
             builder.AppendLine($"public class {className} : GraphQlQueryBuilder<{className}>");
@@ -499,27 +496,12 @@ using System.Text;
             {
                 foreach (var possibleFieldType in type.PossibleTypes)
                 {
-                    GenerateWithObjectFieldMethod(builder, className, "On", possibleFieldType, null, null, true, "        return ", "...on ");
+                    GenerateWithObjectFieldMethod(builder, className, "On", possibleFieldType, null, null, true, "        return ", "... on ");
                     builder.AppendLine();
                 }
             }
 
             builder.AppendLine("}");
-
-            if (type.PossibleTypes != null)
-            {
-                foreach (var possibleFieldType in type.PossibleTypes)
-                {
-                    builder.AppendLine();
-                    var possibleType = _typesDictionary[possibleFieldType.Name];
-                    GenerateTypeQueryBuilder(
-                        possibleType,
-                        queryPrefix,
-                        builder,
-                        isDescendant ? parentTypes.Union(new List<GraphQlType> { type }).ToList() : new List<GraphQlType> { type });
-                    builder.AppendLine();
-                }
-            }
         }
 
         private static void GenerateWithObjectFieldMethod(
